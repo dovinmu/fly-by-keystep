@@ -74,6 +74,9 @@ class Airplane:
         }
         self.current_say_process = None
     
+    def handle_key_press(self, note, velocity):
+        return False
+    
     def say(self, text):
         # Terminate the previous say command if it's still running
         if self.current_say_process and self.current_say_process.poll() is None:
@@ -125,8 +128,10 @@ class Cessna172(Airplane):
         self.message = f"ALT: {self.ap['alt']} amt {amount} new {new_fl}"
 
     def adjust_heading(self, new_heading):
+        self.message = "heading not implemented on C172"
+        return
         self.message = f"setting {new_heading}"
-        if self.plane.send_request("HEADING_BUG_SET", {"value_to_use": new_heading}):
+        if self.send_request("HEADING_BUG_SET", {"value_to_use": new_heading}):
             self.message = f"set {new_heading}"
 
     def adjust_speed(self, new_spd):
@@ -219,6 +224,7 @@ class MysterySpaceship(Airplane):
         self.plane_type = "X"
         self.message = "MysterySpaceship initialized"
         self.sound_cooldowns = { }
+        self.oxygen_levels = 100
 
     def send_request(self, endpoint, body=None):
         return True
@@ -235,15 +241,41 @@ class MysterySpaceship(Airplane):
                 self.sound_cooldowns['beep.mp3'] = time.time() + 5
         else:
             self.sound_cooldowns = { }
-
+    def set_oxygen_levels(self, delta):
+        self.oxygen_levels += delta
+        if self.oxygen_levels > 120:
+            time.sleep(2)
+            self.say("Warning: oxygen levels too high. Decreasing to nominal.")
+            self.oxygen_levels = 100
+        if self.oxygen_levels < 80:
+            time.sleep(2)
+            self.say("Warning: oxygen levels too low. Increasing to nominal.")
+            self.oxygen_levels = 100
     def handle_key_press(self, note, velocity):
         # return True to stop the Keystep's handle_key_press from executing
-        if note == 78:
+        if note == 68:
+            self.say("Cannot set heading in orbit mode.")
+        elif note == 70:
+            self.say("Galactic positioning system locked")
+        elif note == 77:
+            self.say("Cruise mode already activated")
+        elif note == 78:
             self.say("WARNING: Autopilot disengaged")
         elif note == 80:
-            self.say("Oxygen levels decreased in cargo hold")
+            self.say("decreasing oxygen levels")
+            self.set_oxygen_levels(-10)
         elif note == 82:
-            self.say("Oxygen levels increased in cargo hold")
+            self.say("increasing oxygen levels")
+            self.set_oxygen_levels(-10)
+        elif note == 83:
+            self.say("cannot decrease quantum nano-hydrazine")
+        elif note == 84:
+            self.say("cannot increase quantum nano-hydrazine")
+        else:
+            # self.say(str(note))
+            self.message = note
+            return False
+        return True
 
 class KeystepController:
     def __init__(self, airplane_type=None):
@@ -653,20 +685,20 @@ class KeystepController:
             elif note == 79:
                 if self.set_knobs_mode("FL"):
                     play_sound("toggle")
-            elif note == 80: # +. behavior depends on mode
+            elif note == 80: # -. behavior depends on mode
                 if self.current_mode == "FLIGHT_PLAN":
                     play_sound()
-                    self.plane.send_request("MobiFlight.AS1000_MFD_RANGE_DEC")     
-                if self.current_mode == "FL":
-                    play_sound()
-                    self.plane.send_request("AP_VS_VAR_INC")
-            elif note == 82: # -. behavior depends on mode
-                if self.current_mode == "FLIGHT_PLAN":
-                    play_sound()
-                    self.plane.send_request("MobiFlight.AS1000_MFD_RANGE_INC")
+                    self.plane.send_request("MobiFlight.AS1000_MFD_RANGE_INC")     
                 if self.current_mode == "FL":
                     play_sound()
                     self.plane.send_request("AP_VS_VAR_DEC")
+            elif note == 82: # +. behavior depends on mode
+                if self.current_mode == "FLIGHT_PLAN":
+                    play_sound()
+                    self.plane.send_request("MobiFlight.AS1000_MFD_RANGE_DEC") # yes, DEC zooms in 
+                if self.current_mode == "FL":
+                    play_sound()
+                    self.plane.send_request("AP_VS_VAR_INC")
             elif note == 83:
                 self.adjust_qnh(-1)
             elif note == 84:
@@ -816,11 +848,12 @@ if __name__ == "__main__":
     controller = KeystepController(args.airplane_type)
     print("\n\n\n")
     if args.airplane_type == 'X':
-        controller.handle_key_press(78, 1)
-        time.sleep(5)
-        controller.handle_key_press(80, 1)
-        time.sleep(0.5)
-        controller.handle_key_press(80, 1)
+        # controller.handle_key_press(78, 1)
+        # time.sleep(5)
+        # controller.handle_key_press(80, 1)
+        # time.sleep(0.5)
+        # controller.handle_key_press(80, 1)
+        pass
 
     controller.run()
 
