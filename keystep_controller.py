@@ -79,6 +79,7 @@ class Airplane:
             "alt": 1,
             "vs": 0
         }
+        self.message = ''
     
     def handle_key_press(self, note, velocity):
         return False
