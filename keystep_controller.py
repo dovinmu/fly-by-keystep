@@ -569,7 +569,7 @@ class KeystepController:
                 if counter >= update_interval * (1/heartbeat_interval):  # 10 * 0.1s = 1s
                     # self.fetch_state() # creates annoying sync issues, skip for now
                     counter = 0
-                    self.message = f"{time.time()}"
+                    self.message = f"ts {int(time.time())}"
                     self.plane.message = ""
         except KeyboardInterrupt:
             print("\nExiting...")

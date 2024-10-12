@@ -34,6 +34,8 @@ class Airplane:
         self.message = ''
     
     def handle_key_press(self, note, velocity):
+        # probably shouldn't do anything more
+        self.message = note
         return False
     
     def say(self, text):
@@ -229,8 +231,15 @@ class MysterySpaceship(Airplane):
             time.sleep(2)
             self.say("Warning: oxygen levels too low. Increasing to nominal.")
             self.oxygen_levels = 100
+
     def handle_key_press(self, note, velocity):
         # return True to stop the Keystep's handle_key_press from executing
+        if super().handle_key_press(note, velocity):
+            return True
+
+        if note < 68:
+            return False
+
         if note == 68:
             self.say("Cannot set heading in orbit mode.")
         elif note == 70:
@@ -246,11 +255,9 @@ class MysterySpaceship(Airplane):
             self.say("increasing oxygen levels")
             self.set_oxygen_levels(-10)
         elif note == 83:
-            self.say("cannot decrease quantum nano-hydrazine")
+            play_sound(fname='access-denied.mp3')
         elif note == 84:
-            self.say("cannot increase quantum nano-hydrazine")
-        else:
-            # self.say(str(note))
-            self.message = note
-            return False
+            play_sound(fname='access-denied.mp3')
+
+        # don't let the default keystep logic do anything
         return True
