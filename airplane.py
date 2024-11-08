@@ -2,6 +2,7 @@ import os
 import subprocess
 import time
 from utils import _send_request, play_sound, tuple_to_str, script_dir
+from looping_mp3 import LoopingMP3Player
 
 def create_airplane(airplane_type):
     if airplane_type.upper() in set(("C172", "CESSNA", "C4J")):
@@ -33,6 +34,9 @@ class Airplane:
         }
         self.message = ''
     
+    def update_knobs(self):
+        pass
+
     def handle_key_press(self, note, velocity):
         # probably shouldn't do anything more
         self.message = note
@@ -205,6 +209,40 @@ class MysterySpaceship(Airplane):
         self.message = "MysterySpaceship initialized"
         self.sound_cooldowns = { }
         self.oxygen_levels = 100
+        print("initializing mp3 player")
+        self.vibe_1 = LoopingMP3Player('music/myNoise_HealingWater.mp3')
+        self.vibe_2 = LoopingMP3Player('music/myNoise_AzureTrails.mp3')
+        self.vibe_3 = LoopingMP3Player('music/myNoise_SpaceExploration.mp3')
+        self.vibe_4 = LoopingMP3Player('music/myNoise_ModernStarship.mp3')
+
+        self.vibe_1.set_volume(0)
+        self.vibe_2.set_volume(0)
+        self.vibe_3.set_volume(0)
+        self.vibe_4.set_volume(0)
+
+        self.vibe_1.play()
+        self.vibe_2.play()
+        self.vibe_3.play()
+        self.vibe_4.play()
+
+        print("hello")
+
+
+    def update_knobs(self, knobs_moved, knob_values, keys_being_pressed):
+        if super().update_knobs():
+            return True
+        
+        # map from knob val of 0 - 128 to 0.0 - 1.0
+        if knobs_moved[0]:
+            self.vibe_1.set_volume(knob_values[0]/128)
+        if knobs_moved[1]:
+            self.vibe_2.set_volume(knob_values[1]/128)
+        if knobs_moved[2]:
+            self.vibe_3.set_volume(knob_values[2]/128)
+        if knobs_moved[3]:
+            self.vibe_4.set_volume(knob_values[3]/128)
+        
+        return True
 
     def send_request(self, endpoint, body=None):
         return True
@@ -221,6 +259,8 @@ class MysterySpaceship(Airplane):
                 self.sound_cooldowns['beep.mp3'] = time.time() + 5
         else:
             self.sound_cooldowns = { }
+
+
     def set_oxygen_levels(self, delta):
         self.oxygen_levels += delta
         if self.oxygen_levels > 120:
@@ -241,23 +281,32 @@ class MysterySpaceship(Airplane):
             return False
 
         if note == 68:
-            self.say("Cannot set heading in orbit mode.")
+            # self.say("Cannot set heading in orbit mode.")
+            pass
         elif note == 70:
-            self.say("Galactic positioning system locked")
+            # self.say("Galactic positioning system locked")
+            pass
         elif note == 77:
-            self.say("Cruise mode already activated")
+            # self.say("Cruise mode already activated")
+            pass
         elif note == 78:
-            self.say("WARNING: Autopilot disengaged")
+            # self.say("WARNING: Autopilot disengaged")
+            pass
         elif note == 80:
-            self.say("decreasing oxygen levels")
-            self.set_oxygen_levels(-10)
+            # self.say("decreasing oxygen levels")
+            # self.set_oxygen_levels(-10)
+            pass
         elif note == 82:
-            self.say("increasing oxygen levels")
-            self.set_oxygen_levels(-10)
+            # self.say("increasing oxygen levels")
+            # self.set_oxygen_levels(-10)
+            pass
         elif note == 83:
-            play_sound(fname='access-denied.mp3')
+            # play_sound(fname='access-denied.mp3')
+            pass
         elif note == 84:
-            play_sound(fname='access-denied.mp3')
+            # play_sound(fname='access-denied.mp3')
+            pass
 
         # don't let the default keystep logic do anything
         return True
+

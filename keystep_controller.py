@@ -38,8 +38,8 @@ class KeystepController:
         self.midi_lock = threading.Lock()
         self.last_printed_lines = 0
         self.message = ""
-
-        self.fetch_state()
+        if airplane_type.lower() != 'x':
+            self.fetch_state()
 
     def fetch_state(self):
         try:
@@ -148,6 +148,8 @@ class KeystepController:
 
     def update_knobs(self):
         if not any(self.knobs_moved.values()):
+            return
+        if self.plane.update_knobs(self.knobs_moved, self.knob_values, self.keys_being_pressed):
             return
         with self.midi_lock:
             # knobs 1 and 2: comms
