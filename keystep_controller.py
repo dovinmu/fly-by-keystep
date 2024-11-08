@@ -9,273 +9,8 @@ import sys
 import threading
 import time
 
-script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-
-MCA_SERVER = "http://10.0.0.15:4000"
-def _send_request(endpoint, body=None):
-    url = f"{MCA_SERVER}/event/{endpoint}/trigger"
-    try:
-        if body:
-            response = requests.post(url, json=body)
-        else:
-            response = requests.post(url)
-        
-        if response.status_code == 200:
-            # print(f" - {endpoint}")
-            return True
-        else:
-            print(f"Failed to send request to {endpoint}. Status code: {response.status_code}")
-            return False
-    except requests.RequestException as e:
-        print(f"Error sending request to {endpoint}: {e}")
-        return False
-
-def play_sound(sound_iface_name="default", volume=1.0, fname=None):
-    sounds_lookup = {
-        "default": "click_swip",
-        "toggle": "click_swap",
-        "press": "click_mouse"
-    }
-    if not fname:
-        fname = sounds_lookup[sound_iface_name] if sound_iface_name in sounds_lookup else sounds_lookup["default"]
-        if '.' not in fname:
-            fname += ".wav"
-    sound_path = os.path.join(script_dir, 'sfx', f"{fname}")
-    subprocess.Popen(["afplay", "-v", str(volume), sound_path])
-
-def freq_to_tuple(freq):
-    integer_part = int(float(freq))
-    fractional_part = int(round((float(freq) - integer_part) * 1000))
-    return (integer_part, fractional_part)
-
-def tuple_to_str(freq_tuple):
-    return f"{freq_tuple[0]}.{freq_tuple[1]:03d}"
-
-def create_airplane(airplane_type):
-    if airplane_type.upper() == "C172":
-        return Cessna172()
-    elif airplane_type.upper() == "A320":
-        return Airbus320()
-    elif airplane_type.upper() == "X":
-        return MysterySpaceship()
-    else:
-        return Airplane()
-    
-class Airplane:
-    def __init__(self):
-        self.plane_type = "GENERIC"
-        self.active_radio = 1  # 1 or 2 refers to which COM the knobs will change, 3 or 4 which NAV
-        self.transmit_com = 1 # TODO
-        self.radio = {
-            1: { "active": (118,0), "standby": (118,0) },
-            2: { "active": (118,0), "standby": (118,0) },
-            3: { "active": (118,0), "standby": (118,0) },
-            4: { "active": (118,0), "standby": (118,0) }
-        }
-        self.current_say_process = None
-    
-    def handle_key_press(self, note, velocity):
-        return False
-    
-    def say(self, text):
-        # Terminate the previous say command if it's still running
-        if self.current_say_process and self.current_say_process.poll() is None:
-            self.current_say_process.terminate()
-            try:
-                self.current_say_process.wait(timeout=0.25)
-            except subprocess.TimeoutExpired:
-                self.current_say_process.kill()
-
-        voice = "Moira (Enhanced)"
-        self.current_say_process = subprocess.Popen(["say", "-v", str(voice), str(text), '-r', str(180)])
-    
-    def send_request(self, endpoint, body=None):
-        return _send_request(endpoint, body)
-
-    def get_announcements_list(self):
-        return [fname for fname in os.listdir(script_dir/'sfx') if '.mp3' in fname]
-
-    def heartbeat(self):
-        pass    
-    def adjust_fl(self, new_fl):
-        pass
-    def adjust_heading(self, new_heading):
-        pass
-    def adjust_speed(self, new_spd):
-        pass
-    def adjust_vs(self, new_vs):
-        pass
-
-class Cessna172(Airplane):
-    def __init__(self):
-        super().__init__()
-        self.plane_type = "C172"
-        self.message = "Cessna 172 initialized"
-    
-    def adjust_fl(self, new_fl):
-        self.message = "FL not implemented on C172"
-        return
-        amount = int((new_fl - self.ap['alt']) / 10)
-        if amount > 0:
-            endpoint = "AP_ALT_VAR_INC"
-            delta = 10
-        else: 
-            endpoint = "AP_ALT_VAR_DEC"
-            delta = -10
-        for _ in range(min(abs(amount), 10)):
-            self.plane.send_request(endpoint)
-            self.ap['alt'] += delta
-        self.message = f"ALT: {self.ap['alt']} amt {amount} new {new_fl}"
-
-    def adjust_heading(self, new_heading):
-        self.message = "heading not implemented on C172"
-        return
-        self.message = f"setting {new_heading}"
-        if self.send_request("HEADING_BUG_SET", {"value_to_use": new_heading}):
-            self.message = f"set {new_heading}"
-
-    def adjust_speed(self, new_spd):
-        self.message = "speed not implemented on C172"
-        return
-    
-    def adjust_vs(self, new_vs):
-        self.message = "VS not implemented on C172"
-        return
-        amount = int((new_vs - self.ap['vs']) / 100)
-        if amount > 0:
-            endpoint = "AP_VS_VAR_INC"
-            delta = 100
-        else:
-            endpoint = "AP_VS_VAR_DEC"
-            delta = -100
-        for _ in range(min(abs(amount), 10)):
-            self.plane.send_request(endpoint)
-            self.ap['vs'] += delta
-        self.message = f"VS: {self.ap['vs']} amt {amount} new {new_vs}"
-
-class Airbus320(Airplane):
-    def __init__(self):
-        super().__init__()
-        self.plane_type = "A320"
-        self.message = "Airbus320 initialized"
-
-    def adjust_heading(self, new_hdg):
-        try:
-            amount = int(new_hdg - self.ap['heading'])
-        except:
-            amount = int(new_hdg)
-        if amount > 0:
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_HDG_TRK_INC"
-            delta = 1
-        else: 
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_HDG_TRK_DEC"
-            delta = -1
-        for _ in range(min(2, abs(amount))):
-            self.plane.send_request(endpoint)
-            self.ap['heading'] += delta
-        self.message = f"HDG: {self.ap['heading']} amt {amount} new {new_hdg}"
-        # self.fetch_state()
-
-    def adjust_speed(self, new_spd):
-        try:
-            amount = int(new_spd) - int(self.ap['speed'])
-        except:
-            amount = int(new_spd) - 100
-        if amount > 0:
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_SPD_INC"
-            delta = 1
-        else: 
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_SPD_DEC"
-            delta = -1
-        for _ in range(min(2, abs(amount))):
-            self.send_request(endpoint)
-            self.ap['speed'] += delta
-        self.message = f"SPD: {self.ap['speed']} amt {amount} new {new_spd}"
-
-    def adjust_fl(self, new_fl):
-        amount = int((new_fl - self.ap['alt']) / 10)
-        if amount > 0:
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_ALT_INC"
-            delta = 10
-        else: 
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_ALT_DEC"
-            delta = -10
-        for _ in range(min(abs(amount), 10)):
-            self.send_request(endpoint)
-            self.ap['alt'] += delta
-        self.message = f"ALT: {self.ap['alt']} amt {amount} new {new_fl}"
-
-    def adjust_vs(self, new_vs):
-        amount = int((new_vs - self.ap['vs']) / 100)
-        if amount > 0:
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_VS_INC"
-            delta = 100
-        else:
-            endpoint = "MobiFlight.FBW_A32NX_DEV_FCU_VS_DEC"
-            delta = -100
-        for _ in range(min(abs(amount), 10)):
-            self.send_request(endpoint)
-            self.ap['vs'] += delta
-        self.message = f"VS: {self.ap['vs']} amt {amount} new {new_vs}"
-
-class MysterySpaceship(Airplane):
-    def __init__(self):
-        super().__init__()
-        self.plane_type = "X"
-        self.message = "MysterySpaceship initialized"
-        self.sound_cooldowns = { }
-        self.oxygen_levels = 100
-
-    def send_request(self, endpoint, body=None):
-        return True
-    
-    def get_announcements_list(self):
-        return [fname.replace('mystery_', '') for fname in os.listdir(script_dir/'sfx') if 'mystery' in fname] + ['beep.mp3']
-
-    def heartbeat(self):
-        if tuple_to_str(self.radio[self.active_radio]['active']) == "118.100":
-            sound_name = "beep.mp3"
-            if sound_name not in self.sound_cooldowns or time.time() - self.sound_cooldowns[sound_name] > 5:
-                play_sound(fname="beep.mp3")
-                self.message = "played sound"
-                self.sound_cooldowns['beep.mp3'] = time.time() + 5
-        else:
-            self.sound_cooldowns = { }
-    def set_oxygen_levels(self, delta):
-        self.oxygen_levels += delta
-        if self.oxygen_levels > 120:
-            time.sleep(2)
-            self.say("Warning: oxygen levels too high. Decreasing to nominal.")
-            self.oxygen_levels = 100
-        if self.oxygen_levels < 80:
-            time.sleep(2)
-            self.say("Warning: oxygen levels too low. Increasing to nominal.")
-            self.oxygen_levels = 100
-    def handle_key_press(self, note, velocity):
-        # return True to stop the Keystep's handle_key_press from executing
-        if note == 68:
-            self.say("Cannot set heading in orbit mode.")
-        elif note == 70:
-            self.say("Galactic positioning system locked")
-        elif note == 77:
-            self.say("Cruise mode already activated")
-        elif note == 78:
-            self.say("WARNING: Autopilot disengaged")
-        elif note == 80:
-            self.say("decreasing oxygen levels")
-            self.set_oxygen_levels(-10)
-        elif note == 82:
-            self.say("increasing oxygen levels")
-            self.set_oxygen_levels(-10)
-        elif note == 83:
-            self.say("cannot decrease quantum nano-hydrazine")
-        elif note == 84:
-            self.say("cannot increase quantum nano-hydrazine")
-        else:
-            # self.say(str(note))
-            self.message = note
-            return False
-        return True
+from airplane import create_airplane
+from utils import play_sound, freq_to_tuple, tuple_to_str, request_current_data
 
 class KeystepController:
     def __init__(self, airplane_type=None):
@@ -296,12 +31,6 @@ class KeystepController:
         self.pfd_range = 10
         self.xpndr = "1200"
         self.baro_measurement = 0
-        self.ap = {
-            "heading": 180,
-            "speed": 100,
-            "alt": 1,
-            "vs": 0
-        }
         self.speed = 100
 
         self.current_mode = "XPNDR"
@@ -309,13 +38,13 @@ class KeystepController:
         self.midi_lock = threading.Lock()
         self.last_printed_lines = 0
         self.message = ""
-
-        self.fetch_state()
+        if airplane_type.lower() != 'x':
+            self.fetch_state()
 
     def fetch_state(self):
         try:
             with self.midi_lock:
-                response = requests.get(f"{MCA_SERVER}/ui", timeout=3)
+                response = request_current_data()
                 if response.status_code == 200:
                     data = response.json()
                     print(json.dumps(data, indent=2))
@@ -323,7 +52,7 @@ class KeystepController:
                     self.plane.radio[1]["standby"] = freq_to_tuple(data['COM1_STANDBY'])
                     self.plane.radio[2]["active"] = freq_to_tuple(data['COM2_ACTIVE'])
                     self.plane.radio[2]["standby"] = freq_to_tuple(data['COM2_STANDBY'])
-                    self.ap = self.load_plane_data(data)
+                    self.plane.ap = self.load_plane_data(data)
                     self.message = "✅"
                 else:
                     print(f"Failed to fetch initial state. Status code: {response.status_code}")
@@ -420,8 +149,13 @@ class KeystepController:
     def update_knobs(self):
         if not any(self.knobs_moved.values()):
             return
+        if self.plane.update_knobs(self.knobs_moved, self.knob_values, self.keys_being_pressed):
+            return
         with self.midi_lock:
             # knobs 1 and 2: comms
+            if 71 in self.keys_being_pressed:
+                self.message = "prevented knob update"
+                return
             if self.knobs_moved[0]:
                 new_integer = self.map_integer_knob(self.knob_values[0])
                 new_fractional = self.plane.radio[self.plane.active_radio]["active"][1]
@@ -456,13 +190,8 @@ class KeystepController:
                         if self.plane.send_request("MobiFlight.A320_Neo_MFD_NAV_MODE_1_{new_pfd_setting}"):
                             play_sound(volume=0.1)
                         self.message = f"setting: '{new_pfd_setting}'"
-                    else:
-                        if self.knob_changes[2] > 0:
-                            self.plane.send_request("MobiFlight.AS1000_MFD_FMS_Lower_INC")
-                            self.message = "FMS+"
-                        elif self.knob_changes[2] < 0:
-                            self.plane.send_request("MobiFlight.AS1000_MFD_FMS_Lower_DEC")
-                            self.message = "FMS-"
+                    elif self.plane.plane_type == "C172":
+                        self.plane.handle_lower_fms_knob_moved(self.knob_changes[2], self.knob_values[2])
                 if self.current_mode == "XPNDR":
                     # print(self.knob_values[2])
                     scaled_value = self.map_xpndr_knob(self.knob_values[2])
@@ -471,7 +200,7 @@ class KeystepController:
                     self.set_xpndr(new_value)
                 if self.current_mode == "CRUISE":
                     new_spd = self.map_speed_knob(self.knob_values[2])
-                    self.plane.adjust_speed(new_spd)
+                    self.plane.set_speed(new_spd)
                 if self.current_mode == "FL":
                     new_fl = self.map_fl_knob(self.knob_values[2])
                     self.plane.adjust_fl(new_fl)
@@ -484,10 +213,8 @@ class KeystepController:
                         if self.plane.send_request("MobiFlight.A320_neo_MFD_Range_1_{new_pfd_range}"):
                             play_sound(volume=0.1)
                         self.message = f"range: '{new_pfd_range}'"
-                    if self.knob_changes[3] > 0:
-                        self.plane.send_request("MobiFlight.AS1000_MFD_FMS_Upper_INC")
-                    elif self.knob_changes[3] < 0:
-                        self.plane.send_request("MobiFlight.AS1000_MFD_FMS_Upper_DEC")
+                    elif self.plane.plane_type == "C172":
+                        self.plane.handle_upper_fms_knob_moved(self.knob_changes[3], self.knob_values[3])
                 if self.current_mode == "XPNDR":
                     # print(self.knob_values[3])
                     scaled_value = self.map_xpndr_knob(self.knob_values[3])
@@ -502,7 +229,7 @@ class KeystepController:
                 if self.current_mode == "CRUISE":
                     play_sound(volume=0.1)
                     new_hdg = self.map_heading_knob(self.knob_values[3])
-                    self.plane.adjust_heading(new_hdg)
+                    self.plane.set_heading(new_hdg)
                 if self.current_mode == "FL":
                     play_sound(volume=0.1)
                     new_vs = self.map_vs_knob(self.knob_values[3])
@@ -636,21 +363,30 @@ class KeystepController:
             elif note == 60:
                 play_sound("press")
                 self.plane.send_request("MobiFlight.A320_Neo_MFD_NAV_MODE_1_PLAN")
+            elif note == 66:
+                if self.current_mode == "FL":
+                    play_sound("press")
+                    self.plane.vs_button()
             elif note == 68: # overflow selector details
                 if self.current_mode == "CRUISE":       
                     play_sound()
                     self.plane.send_request("AP_PANEL_HEADING_HOLD")
+                if self.current_mode == "FL":
+                    self.plane.send_request("AP_PANEL_ALTITUDE_HOLD")
             elif note == 70: # overflow selector details
                 if self.current_mode == "CRUISE":       
                     play_sound()
                     self.plane.send_request("AP_NAV1_HOLD")
+                if self.current_mode == "FLIGHT_PLAN":
+                    self.plane.send_request("MobiFlight.AS1000_MFD_ENT_Push") # C172-specific
+            elif note == 71:
+                play_sound()
+                self.keys_being_pressed.add(note)
             elif note == 72:
                 if self.set_knobs_mode("FLIGHT_PLAN"):
                     play_sound("toggle")
             elif note == 73: # behavior depends on mode
                 # pull if tapped, push if pressed
-                if self.current_mode == "FLIGHT_PLAN":
-                    self.plane.send_request("MobiFlight.AS1000_MFD_ENT_Push") # C172-specific
                 if self.current_mode == "CRUISE":
                     self.set_speed_mode("selected")
                 if self.current_mode == "FL":
@@ -692,6 +428,8 @@ class KeystepController:
                 if self.current_mode == "FL":
                     play_sound()
                     self.plane.send_request("AP_VS_VAR_DEC")
+                if self.current_mode == "CRUISE":
+                    self.plane.set_heading(-1)
             elif note == 82: # +. behavior depends on mode
                 if self.current_mode == "FLIGHT_PLAN":
                     play_sound()
@@ -699,6 +437,8 @@ class KeystepController:
                 if self.current_mode == "FL":
                     play_sound()
                     self.plane.send_request("AP_VS_VAR_INC")
+                if self.current_mode == "CRUISE":
+                    self.plane.set_heading(1)
             elif note == 83:
                 self.adjust_qnh(-1)
             elif note == 84:
@@ -739,6 +479,8 @@ class KeystepController:
         self.keys_being_pressed.remove(key)
         if key == 57:
             self.current_displayed_sound = None
+        if key == 71:
+            play_sound()
     
     def set_knobs_mode(self, mode):
         if mode not in ("TAXI", "FLIGHT_PLAN", "XPNDR", "CRUISE", "FL"):
@@ -829,7 +571,7 @@ class KeystepController:
                 if counter >= update_interval * (1/heartbeat_interval):  # 10 * 0.1s = 1s
                     # self.fetch_state() # creates annoying sync issues, skip for now
                     counter = 0
-                    self.message = ""
+                    self.message = f"ts {int(time.time())}"
                     self.plane.message = ""
         except KeyboardInterrupt:
             print("\nExiting...")
