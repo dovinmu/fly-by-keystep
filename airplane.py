@@ -213,7 +213,7 @@ class MysterySpaceship(Airplane):
         self.vibe_1 = LoopingMP3Player('music/myNoise_HealingWater.mp3')
         self.vibe_2 = LoopingMP3Player('music/myNoise_AzureTrails.mp3')
         self.vibe_3 = LoopingMP3Player('music/myNoise_SpaceExploration.mp3')
-        self.vibe_4 = LoopingMP3Player('music/myNoise_ModernStarship.mp3')
+        self.vibe_4 = LoopingMP3Player('music/myNoise_VoltageBytes.mp3')
 
         self.vibe_1.set_volume(0)
         self.vibe_2.set_volume(0)
