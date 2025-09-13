@@ -5,7 +5,7 @@ import subprocess
 
 script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 
-MCA_SERVER = "http://10.0.0.15:4000"
+MCA_SERVER = "http://10.0.0.110:4000"
 def _send_request(endpoint, body=None):
     url = f"{MCA_SERVER}/event/{endpoint}/trigger"
     try:
