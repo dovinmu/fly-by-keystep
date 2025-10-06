@@ -34,7 +34,7 @@ class Airplane:
         }
         self.message = ''
     
-    def update_knobs(self):
+    def update_knobs(self, knobs_moved, knob_values, keys_being_pressed):
         pass
 
     def handle_key_press(self, note, velocity):
@@ -229,7 +229,7 @@ class MysterySpaceship(Airplane):
 
 
     def update_knobs(self, knobs_moved, knob_values, keys_being_pressed):
-        if super().update_knobs():
+        if super().update_knobs(knobs_moved, knob_values, keys_being_pressed):
             return True
         
         # map from knob val of 0 - 128 to 0.0 - 1.0
